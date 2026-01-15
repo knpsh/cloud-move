@@ -11,7 +11,6 @@ if [[ -z "$CLOUD_ID" ]]; then
   exit 1
 fi
 
-# Requirements: yc, jq
 command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 

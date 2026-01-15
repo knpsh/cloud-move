@@ -11,7 +11,6 @@ if [[ -z "$CLOUD_ID" ]]; then
   exit 1
 fi
 
-# Requirements: yc, jq
 command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 
@@ -36,11 +35,9 @@ fi
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 
-# Function to map group ID from source to target
 map_group() {
   local source_id="$1"
 
-  # Get group name from source groups
   local group_name=$(jq -r --arg id "$source_id" '.[] | select(.id == $id) | .name' < "$SOURCE_GROUPS")
 
   if [[ -z "$group_name" || "$group_name" == "null" ]]; then
@@ -48,7 +45,6 @@ map_group() {
     return 1
   fi
 
-  # Get target ID from target groups
   local target_id=$(jq -r --arg name "$group_name" '.[] | select(.name == $name) | .id' < "$TARGET_GROUPS")
 
   if [[ -z "$target_id" || "$target_id" == "null" ]]; then
@@ -82,7 +78,6 @@ while IFS= read -r line; do
 
   log "Processing binding: ${group_name} (${source_group_id}) - role: ${role_id}"
 
-  # Map source group to target group by name
   if ! target_group_id=$(map_group "$source_group_id"); then
     log "  ✗ Skipping - could not map group"
     log ""
