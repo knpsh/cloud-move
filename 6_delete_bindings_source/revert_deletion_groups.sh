@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage:
-#   ./revert_deletion.sh <cloud-id>
+#   ./revert_deletion_groups.sh <cloud-id>
 
 CLOUD_ID="${1:-}"
 
@@ -15,7 +15,7 @@ fi
 command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 
-INPUT_FILE="bindings/${CLOUD_ID}/federatedusers.jsonl"
+INPUT_FILE="bindings/${CLOUD_ID}/groups.jsonl"
 
 if [[ ! -f "$INPUT_FILE" ]]; then
   echo "Error: Input file not found: ${INPUT_FILE}" >&2
@@ -35,48 +35,47 @@ if [[ "$binding_count" -eq 0 ]]; then
   exit 0
 fi
 
-log "Restoring ${binding_count} federated user bindings..."
+log "Restoring ${binding_count} group bindings..."
 log ""
 
 while IFS= read -r line; do
-  user_id=$(jq -r '.id' <<< "$line")
+  group_id=$(jq -r '.id' <<< "$line")
   role_id=$(jq -r '.role_id' <<< "$line")
   cloud_id=$(jq -r '.cloud_id // empty' <<< "$line")
   folder_id=$(jq -r '.folder_id // empty' <<< "$line")
-  name_id=$(jq -r '.name_id // empty' <<< "$line")
 
   if [[ -n "$cloud_id" ]]; then
-    log "Restoring cloud binding: ${name_id} (${user_id}) - role: ${role_id}"
+    log "Restoring cloud binding: group ${group_id} - role: ${role_id}"
     log "  Cloud: ${cloud_id}"
 
     if yc resource-manager cloud add-access-binding \
       --id "${cloud_id}" \
       --role "${role_id}" \
-      --user-account-id "${user_id}" 2>&1; then
+      --subject group:"${group_id}" 2>&1; then
       log "  ✓ Successfully restored cloud binding"
     else
       log "  ✗ Failed to restore cloud binding"
     fi
 
   elif [[ -n "$folder_id" ]]; then
-    log "Restoring folder binding: ${name_id} (${user_id}) - role: ${role_id}"
+    log "Restoring folder binding: group ${group_id} - role: ${role_id}"
     log "  Folder: ${folder_id}"
 
     if yc resource-manager folder add-access-binding \
       --id "${folder_id}" \
       --role "${role_id}" \
-      --user-account-id "${user_id}" 2>&1; then
+      --subject group:"${group_id}" 2>&1; then
       log "  ✓ Successfully restored folder binding"
     else
       log "  ✗ Failed to restore folder binding"
     fi
 
   else
-    log "WARNING: No cloud_id or folder_id found for binding: ${user_id}"
+    log "WARNING: No cloud_id or folder_id found for binding: ${group_id}"
   fi
 
   log ""
 done < "${INPUT_FILE}"
 
 log "Done."
-log "Restored bindings for ${binding_count} federated users."
+log "Restored bindings for ${binding_count} groups."
