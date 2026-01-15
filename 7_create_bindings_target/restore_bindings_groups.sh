@@ -1,14 +1,13 @@
-!/usr/bin/env bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Usage:
-#   ./restore_bindings_groups.sh <cloud-id> <target-organization-id>
+#   ./restore_bindings_groups.sh <cloud-id>
 
 CLOUD_ID="${1:-}"
-ORGANIZATION_ID="${2:-}"
 
-if [[ -z "$CLOUD_ID" ]] || [[ -z "$ORGANIZATION_ID" ]]; then
-  echo "Usage: $0 <cloud-id> <organization-id>" >&2
+if [[ -z "$CLOUD_ID" ]]; then
+  echo "Usage: $0 <cloud-id>" >&2
   exit 1
 fi
 
@@ -17,46 +16,50 @@ command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 
 INPUT_FILE="bindings/${CLOUD_ID}/groups.jsonl"
+SOURCE_GROUPS="groups/groups.json"
+TARGET_GROUPS="groups/target-groups.json"
 
 if [[ ! -f "$INPUT_FILE" ]]; then
   echo "Error: Input file not found: ${INPUT_FILE}" >&2
   exit 1
 fi
 
+if [[ ! -f "$SOURCE_GROUPS" ]]; then
+  echo "Error: Source groups file not found: ${SOURCE_GROUPS}" >&2
+  exit 1
+fi
+
+if [[ ! -f "$TARGET_GROUPS" ]]; then
+  echo "Error: Target groups file not found: ${TARGET_GROUPS}" >&2
+  exit 1
+fi
+
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 
-# Function to map group name to target group ID
+# Function to map group ID from source to target
 map_group() {
-  local group_name="$1"
+  local source_id="$1"
+
+  # Get group name from source groups
+  local group_name=$(jq -r --arg id "$source_id" '.[] | select(.id == $id) | .name' < "$SOURCE_GROUPS")
 
   if [[ -z "$group_name" || "$group_name" == "null" ]]; then
-    log "    WARNING: Group name is empty"
+    log "    WARNING: Could not find name for source group ID: ${source_id}"
     return 1
   fi
 
-  # Get target group ID by name
-  local target_group_data=$(yc organization-manager group get \
-    --name "${group_name}" \
-    --organization-id "${ORGANIZATION_ID}" \
-    --format json 2>/dev/null)
+  # Get target ID from target groups
+  local target_id=$(jq -r --arg name "$group_name" '.[] | select(.name == $name) | .id' < "$TARGET_GROUPS")
 
-  if [[ -z "$target_group_data" ]]; then
-    log "    WARNING: Could not find group with name: ${group_name}"
+  if [[ -z "$target_id" || "$target_id" == "null" ]]; then
+    log "    WARNING: Could not find target group ID for name: ${group_name}"
     return 1
   fi
 
-  local target_group_id=$(jq -r '.id' <<< "$target_group_data")
-
-  if [[ -z "$target_group_id" || "$target_group_id" == "null" ]]; then
-    log "    WARNING: Could not extract ID for group: ${group_name}"
-    return 1
-  fi
-
-  echo "$target_group_id"
+  echo "$target_id"
 }
 
 log "Cloud ID: ${CLOUD_ID}"
-log "Organization ID: ${ORGANIZATION_ID}"
 log "Input file: ${INPUT_FILE}"
 log ""
 
@@ -80,7 +83,7 @@ while IFS= read -r line; do
   log "Processing binding: ${group_name} (${source_group_id}) - role: ${role_id}"
 
   # Map source group to target group by name
-  if ! target_group_id=$(map_group "$group_name"); then
+  if ! target_group_id=$(map_group "$source_group_id"); then
     log "  ✗ Skipping - could not map group"
     log ""
     continue
