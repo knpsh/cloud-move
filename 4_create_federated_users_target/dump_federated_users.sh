@@ -11,7 +11,6 @@ if [[ -z "$FEDERATION_ID" ]]; then
   exit 1
 fi
 
-# Requirements: yc, jq
 command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 
@@ -35,7 +34,6 @@ if [[ $(echo "$USERS" | jq 'length') -eq 0 ]]; then
   exit 0
 fi
 
-# Extract only id and name_id fields
 echo "$USERS" | jq '[.[] | {id: .id, name_id: .saml_user_account.name_id}]' > "${OUTPUT_FILE}"
 
 user_count=$(echo "$USERS" | jq 'length')

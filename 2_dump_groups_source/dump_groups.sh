@@ -11,7 +11,6 @@ if [[ -z "$ORGANIZATION_ID" ]]; then
   exit 1
 fi
 
-# Requirements: yc, jq
 command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 
@@ -35,7 +34,6 @@ if [[ $(echo "$YC_GROUPS" | jq 'length') -eq 0 ]]; then
   exit 0
 fi
 
-# Initialize empty array
 echo "[]" > "${OUTPUT_FILE}"
 
 echo "$YC_GROUPS" | jq -c '.[]' | while read -r group; do
@@ -44,10 +42,8 @@ echo "$YC_GROUPS" | jq -c '.[]' | while read -r group; do
 
   log "Processing group: ${group_name} (${group_id})"
 
-  # Fetch group members
   members=$(yc organization-manager group list-members "${group_id}" --format json 2>/dev/null || echo "[]")
 
-  # Append to the output file
   jq --argjson new_group "$(jq -n \
     --arg id "$group_id" \
     --arg name "$group_name" \

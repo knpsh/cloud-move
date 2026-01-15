@@ -11,7 +11,6 @@ if [[ -z "$ORGANIZATION_ID" ]]; then
   exit 1
 fi
 
-# Requirements: yc, jq
 command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 
@@ -35,7 +34,6 @@ if [[ $(echo "$YC_GROUPS" | jq 'length') -eq 0 ]]; then
   exit 0
 fi
 
-# Extract only id and name fields
 echo "$YC_GROUPS" | jq '[.[] | {id: .id, name: .name}]' > "${OUTPUT_FILE}"
 
 group_count=$(jq 'length' < "${OUTPUT_FILE}")

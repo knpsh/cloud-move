@@ -11,7 +11,6 @@ if [[ -z "$ORGANIZATION_ID" ]]; then
   exit 1
 fi
 
-# Requirements: yc, jq
 command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 
@@ -36,11 +35,9 @@ fi
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 
-# Function to map federated user ID from source to target
 map_federated_user() {
   local source_id="$1"
 
-  # Get name_id from source users
   local name_id=$(jq -r --arg id "$source_id" '.[] | select(.id == $id) | .name_id' < "$SOURCE_USERS")
 
   if [[ -z "$name_id" || "$name_id" == "null" ]]; then
@@ -48,7 +45,6 @@ map_federated_user() {
     return 1
   fi
 
-  # Get target ID from target users
   local target_id=$(jq -r --arg name_id "$name_id" '.[] | select(.name_id == $name_id) | .id' < "$TARGET_USERS")
 
   if [[ -z "$target_id" || "$target_id" == "null" ]]; then
