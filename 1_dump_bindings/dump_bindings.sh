@@ -3,9 +3,6 @@ set -euo pipefail
 
 # Usage:
 #   ./dump_bindings_v2.sh <cloud-id>
-#
-# Example:
-#   ./dump_bindings_v2.sh b1gkdpe1jr4cpqfq6tsm
 
 CLOUD_ID="${1:-}"
 
@@ -37,7 +34,6 @@ log ""
 : > "${SERVICEACCOUNTS_JSONL}"
 : > "${GROUPS_JSONL}"
 
-# Function to enrich and save a binding based on type
 process_binding() {
   local binding="$1"
   local subject_type=$(jq -r '.type' <<< "$binding")
@@ -72,7 +68,6 @@ process_binding() {
   esac
 }
 
-# 1) Get cloud bindings
 log "Fetching cloud access bindings..."
 yc resource-manager cloud list-access-bindings --id "${CLOUD_ID}" --format json | \
   jq -c --arg cloud_id "$CLOUD_ID" '.[] | {type: .subject.type, id: .subject.id, role_id: .role_id, cloud_id: $cloud_id}' | \
@@ -85,7 +80,6 @@ yc resource-manager cloud list-access-bindings --id "${CLOUD_ID}" --format json 
 
 log ""
 
-# 2) Get folders list
 log "Fetching folders list..."
 FOLDER_IDS=$(yc resource-manager folder list --cloud-id "${CLOUD_ID}" --format json | jq -r '.[].id')
 
@@ -94,7 +88,6 @@ if [[ -z "$FOLDER_IDS" ]]; then
 else
   log "Processing folder bindings..."
 
-  # 3) Get folder bindings
   while IFS= read -r folder_id; do
     log "  Folder: ${folder_id}"
     yc resource-manager folder list-access-bindings --id "${folder_id}" --format json | \
