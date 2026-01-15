@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage:
-#   ./revert_deletion_groups.sh <source-cloud-id>
+#   ./revert_deletion_groups.sh <cloud-id>
 
 CLOUD_ID="${1:-}"
 
