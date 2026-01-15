@@ -15,7 +15,7 @@ fi
 command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 
-ROOT_DIR="dump_${CLOUD_ID}_$(date -u +%Y%m%dT%H%M%SZ)"
+ROOT_DIR="../bindings/${CLOUD_ID}"
 USERACCOUNTS_JSONL="${ROOT_DIR}/useraccounts.jsonl"
 FEDERATEDUSERS_JSONL="${ROOT_DIR}/federatedusers.jsonl"
 SERVICEACCOUNTS_JSONL="${ROOT_DIR}/serviceaccounts.jsonl"
