@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage:
-#   ./create_users.sh <federation-id>
+#   ./create_users.sh <target-federation-id>
 
 FEDERATION_ID="${1:-}"
 

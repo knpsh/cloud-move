@@ -60,7 +60,12 @@ process_binding() {
       echo "$binding" | jq -c '.' >> "${SERVICEACCOUNTS_JSONL}"
       ;;
     group)
-      echo "$binding" | jq -c '.' >> "${GROUPS_JSONL}"
+      if group_data=$(yc organization-manager group get "${subject_id}" --format json 2>/dev/null); then
+        group_name=$(jq -r '.name // empty' <<< "$group_data")
+        echo "$binding" | jq -c --arg name "$group_name" '. + {name: $name}' >> "${GROUPS_JSONL}"
+      else
+        echo "$binding" | jq -c '.' >> "${GROUPS_JSONL}"
+      fi
       ;;
     *)
       log "    WARNING: Unknown subject type: ${subject_type}"

@@ -1,13 +1,14 @@
-#!/usr/bin/env bash
+!/usr/bin/env bash
 set -euo pipefail
 
 # Usage:
-#   ./restore_bindings.sh <cloud-id>
+#   ./restore_bindings_groups.sh <cloud-id> <target-organization-id>
 
 CLOUD_ID="${1:-}"
+ORGANIZATION_ID="${2:-}"
 
-if [[ -z "$CLOUD_ID" ]]; then
-  echo "Usage: $0 <cloud-id>" >&2
+if [[ -z "$CLOUD_ID" ]] || [[ -z "$ORGANIZATION_ID" ]]; then
+  echo "Usage: $0 <cloud-id> <organization-id>" >&2
   exit 1
 fi
 
@@ -15,51 +16,47 @@ fi
 command -v yc >/dev/null 2>&1 || { echo "yc CLI not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq not found (install jq)" >&2; exit 1; }
 
-INPUT_FILE="bindings/${CLOUD_ID}/federatedusers.jsonl"
-SOURCE_USERS="federatedusers/users.json"
-TARGET_USERS="federatedusers/target-users.json"
+INPUT_FILE="bindings/${CLOUD_ID}/groups.jsonl"
 
 if [[ ! -f "$INPUT_FILE" ]]; then
   echo "Error: Input file not found: ${INPUT_FILE}" >&2
   exit 1
 fi
 
-if [[ ! -f "$SOURCE_USERS" ]]; then
-  echo "Error: Source users file not found: ${SOURCE_USERS}" >&2
-  exit 1
-fi
-
-if [[ ! -f "$TARGET_USERS" ]]; then
-  echo "Error: Target users file not found: ${TARGET_USERS}" >&2
-  exit 1
-fi
-
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 
-# Function to map federated user ID from source to target
-map_federated_user() {
-  local source_id="$1"
+# Function to map group name to target group ID
+map_group() {
+  local group_name="$1"
 
-  # Get name_id from source users
-  local name_id=$(jq -r --arg id "$source_id" '.[] | select(.id == $id) | .name_id' < "$SOURCE_USERS")
-
-  if [[ -z "$name_id" || "$name_id" == "null" ]]; then
-    log "    WARNING: Could not find name_id for source user ID: ${source_id}"
+  if [[ -z "$group_name" || "$group_name" == "null" ]]; then
+    log "    WARNING: Group name is empty"
     return 1
   fi
 
-  # Get target ID from target users
-  local target_id=$(jq -r --arg name_id "$name_id" '.[] | select(.name_id == $name_id) | .id' < "$TARGET_USERS")
+  # Get target group ID by name
+  local target_group_data=$(yc organization-manager group get \
+    --name "${group_name}" \
+    --organization-id "${ORGANIZATION_ID}" \
+    --format json 2>/dev/null)
 
-  if [[ -z "$target_id" || "$target_id" == "null" ]]; then
-    log "    WARNING: Could not find target user ID for name_id: ${name_id}"
+  if [[ -z "$target_group_data" ]]; then
+    log "    WARNING: Could not find group with name: ${group_name}"
     return 1
   fi
 
-  echo "$target_id"
+  local target_group_id=$(jq -r '.id' <<< "$target_group_data")
+
+  if [[ -z "$target_group_id" || "$target_group_id" == "null" ]]; then
+    log "    WARNING: Could not extract ID for group: ${group_name}"
+    return 1
+  fi
+
+  echo "$target_group_id"
 }
 
 log "Cloud ID: ${CLOUD_ID}"
+log "Organization ID: ${ORGANIZATION_ID}"
 log "Input file: ${INPUT_FILE}"
 log ""
 
@@ -70,26 +67,26 @@ if [[ "$binding_count" -eq 0 ]]; then
   exit 0
 fi
 
-log "Restoring ${binding_count} federated user bindings..."
+log "Restoring ${binding_count} group bindings..."
 log ""
 
 while IFS= read -r line; do
-  source_user_id=$(jq -r '.id' <<< "$line")
+  source_group_id=$(jq -r '.id' <<< "$line")
+  group_name=$(jq -r '.name // empty' <<< "$line")
   role_id=$(jq -r '.role_id' <<< "$line")
   cloud_id=$(jq -r '.cloud_id // empty' <<< "$line")
   folder_id=$(jq -r '.folder_id // empty' <<< "$line")
-  name_id=$(jq -r '.name_id // empty' <<< "$line")
 
-  log "Processing binding: ${name_id} (${source_user_id}) - role: ${role_id}"
+  log "Processing binding: ${group_name} (${source_group_id}) - role: ${role_id}"
 
-  # Map source user ID to target user ID
-  if ! target_user_id=$(map_federated_user "$source_user_id"); then
-    log "  ✗ Skipping - could not map user"
+  # Map source group to target group by name
+  if ! target_group_id=$(map_group "$group_name"); then
+    log "  ✗ Skipping - could not map group"
     log ""
     continue
   fi
 
-  log "  Mapped to target user: ${target_user_id}"
+  log "  Mapped to target group: ${target_group_id}"
 
   if [[ -n "$cloud_id" ]]; then
     log "  Restoring cloud binding: ${cloud_id}"
@@ -97,7 +94,7 @@ while IFS= read -r line; do
     if yc resource-manager cloud add-access-binding \
       --id "${cloud_id}" \
       --role "${role_id}" \
-      --user-account-id "${target_user_id}" 2>&1; then
+      --subject group:"${target_group_id}" 2>&1; then
       log "  ✓ Successfully restored cloud binding"
     else
       log "  ✗ Failed to restore cloud binding"
@@ -109,7 +106,7 @@ while IFS= read -r line; do
     if yc resource-manager folder add-access-binding \
       --id "${folder_id}" \
       --role "${role_id}" \
-      --user-account-id "${target_user_id}" 2>&1; then
+      --subject group:"${target_group_id}" 2>&1; then
       log "  ✓ Successfully restored folder binding"
     else
       log "  ✗ Failed to restore folder binding"
@@ -123,4 +120,4 @@ while IFS= read -r line; do
 done < "${INPUT_FILE}"
 
 log "Done."
-log "Restored bindings for ${binding_count} federated users."
+log "Restored bindings for ${binding_count} groups."

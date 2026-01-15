@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage:
-#   ./delete_bindings_groups.sh <cloud-id>
+#   ./delete_bindings_groups.sh <source-cloud-id>
 
 CLOUD_ID="${1:-}"
 

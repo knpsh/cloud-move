@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Usage:
-#   ./dump_groups.sh <source-organization-id>
+#   ./dump_groups.sh <target-organization-id>
 
 ORGANIZATION_ID="${1:-}"
 

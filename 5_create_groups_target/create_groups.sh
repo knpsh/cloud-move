@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage:
-#   ./create_groups.sh <organization-id>
+#   ./create_groups.sh <target-organization-id>
 
 ORGANIZATION_ID="${1:-}"
 
